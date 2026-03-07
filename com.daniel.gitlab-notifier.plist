@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+        LaunchAgent: GitLab PR Notification Manager
+        =============================================
+        Runs gitlab_notifier.py every 30 seconds to check for new
+        unread GitLab emails in Apple Mail and send macOS notifications.
+
+        Install to: ~/Library/LaunchAgents/
+        Load with:  launchctl load ~/Library/LaunchAgents/com.daniel.gitlab-notifier.plist
+    -->
+
+    <key>Label</key>
+    <string>com.daniel.gitlab-notifier</string>
+
+    <!-- Run via a shell wrapper that absorbs the applet's exit code.
+         The osacompile'd applet returns exit 78 (EX_CONFIG) even on
+         success, and launchd stops scheduling StartInterval jobs
+         after a non-zero exit.  The wrapper always returns 0. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__SCRIPT_DIR__/run_notifier.sh</string>
+    </array>
+
+    <!-- Set working directory to the project folder (avoids
+         EX_CONFIG from launchd failing to chdir) -->
+    <key>WorkingDirectory</key>
+    <string>__SCRIPT_DIR__</string>
+
+    <!-- Run every 30 seconds -->
+    <key>StartInterval</key>
+    <integer>30</integer>
+
+    <!-- Also run immediately when loaded -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Ensure Homebrew paths are available (for terminal-notifier) -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <!-- Redirect stdout/stderr so launchd doesn't accumulate output -->
+    <key>StandardOutPath</key>
+    <string>__LOG_DIR__/launchd_stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>__LOG_DIR__/launchd_stderr.log</string>
+
+    <!-- Don't retry immediately on failure -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!-- Keep it running -->
+    <key>KeepAlive</key>
+    <false/>
+</dict>
+</plist>
