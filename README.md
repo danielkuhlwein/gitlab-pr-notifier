@@ -1,48 +1,74 @@
-# GitLab PR Notification Manager
+<div align="center">
+  <img src="icons/app_ico.png" alt="GitLab PR Notifier" width="120">
+  <h1>GitLab PR Notifier</h1>
+  <p><em>Never miss a merge request again.<br>Native macOS notifications for GitLab, powered by Apple Mail.</em></p>
 
-Polls Apple Mail for GitLab email notifications, classifies them by type, and sends clickable macOS notifications with per-PR grouping.
+  [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
+  [![Platform: macOS](https://img.shields.io/badge/Platform-macOS-000?style=flat-square&logo=apple&logoColor=white)](https://www.apple.com/macos/)
+  [![Python 3](https://img.shields.io/badge/Python-3-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+  [![Swift](https://img.shields.io/badge/Swift-FA7343?style=flat-square&logo=swift&logoColor=white)](https://swift.org/)
+</div>
+
+<br>
+
+> [!NOTE]
+> A lightweight macOS LaunchAgent that polls Apple Mail every 30 seconds for GitLab email notifications, classifies them into 12 distinct types, and delivers grouped, clickable native notifications — so you can stay on top of code reviews without keeping GitLab open.
+
+## Features
+
+- **Click-to-open notifications** — each notification links directly to the merge request on GitLab
+- **Smart classification** — distinguishes 12 notification types (reviews, approvals, comments, mentions, and more)
+- **Per-PR grouping** — notifications for the same MR stack together in Notification Center
+- **Auto-archiving** — processed emails are moved to a local mailbox and cleaned up after 24 hours
+- **Duplicate-proof** — state tracking ensures you never get the same notification twice
+- **Zero background apps** — runs as a LaunchAgent, no menu bar clutter or Electron overhead
 
 ## How It Works
 
-A macOS **LaunchAgent** runs every 30 seconds and triggers a pipeline:
+```mermaid
+graph LR
+    A["⏱️ LaunchAgent<br/><sub>every 30s</sub>"] --> B["📜 AppleScript<br/><sub>wrapper.applescript</sub>"]
+    B --> C["📧 Mail.app<br/><sub>unread GitLab emails</sub>"]
+    C --> D["🐍 Python Classifier<br/><sub>gitlab_notifier.py</sub>"]
+    D --> E["🔔 Swift Notifier<br/><sub>notify_helper.swift</sub>"]
+    E --> F["💬 Notification Center"]
+```
 
-1. `run_notifier.sh` launches `GitlabNotifier.app` (a compiled AppleScript wrapper)
-2. The AppleScript queries Mail.app for unread emails from `gitlab@mg.gitlab.com`
-3. Email data is passed to `gitlab_notifier.py`, which parses the raw MIME source and classifies the notification type
-4. Notifications are sent via `GitlabNotifyHelper.app` (a Swift helper using `UNUserNotificationCenter`) — this gives proper per-PR grouping in Notification Center and click-to-open-URL support. Falls back to `osascript` if the helper isn't available.
-5. Processed emails are marked as read and moved to a local "Gitlab" mailbox in Mail.app
-6. Emails older than 24 hours are auto-archived from the Gitlab mailbox to Trash
-7. State is persisted in `.notifier_state.json` to avoid duplicate notifications
+1. A macOS LaunchAgent triggers `run_notifier.sh` every 30 seconds
+2. An AppleScript wrapper queries Mail.app for unread emails from `gitlab@mg.gitlab.com`
+3. The Python classifier parses raw MIME sources and detects the notification type
+4. A Swift helper sends native notifications via `UNUserNotificationCenter` with per-PR grouping and click-to-open
+5. Processed emails are marked as read and moved to a local "Gitlab" mailbox
 
-## Email Classification
+## Notification Types
 
-The classifier detects notification types from both subject-line suffixes and HTML body parsing:
+The classifier detects notification types from subject-line suffixes and HTML body parsing:
 
-| Type | Trigger |
-|------|---------|
-| Review requested | Subject suffix `(Review requested)` or body "requested review" |
-| Re-review requested | Subject suffix `(Re-review requested)` |
-| Assigned | Subject suffix `(Assigned)` |
-| Changes requested | Subject suffix `(Changes requested)` |
-| Comment | Subject suffix `(New comment)` or body "commented:" |
-| Approved | Subject suffix `(Approved)` or body "Merge request was approved" |
-| Merged | Subject suffix `(Merged)` or body "was merged" |
-| Closed | Subject suffix `(Closed)` or body "was closed" |
-| Mentioned | Subject suffix `(Mentioned)` or body contains username |
-| Pipeline failure | Subject contains "Failed pipeline" |
-| New commits | Body "pushed new commits to merge request" |
-| Draft updated | Body contains "Draft:" |
-| Catch-all | Any GitLab email with an MR number not matched above |
+| | Type | Trigger |
+|---|------|---------|
+| <img src="icons/Review Requested.png" width="20"> | **Review Requested** | Subject `(Review requested)` or body "requested review" |
+| <img src="icons/Re-Review Requested.png" width="20"> | **Re-Review Requested** | Subject `(Re-review requested)` |
+| <img src="icons/PR Assigned to You.png" width="20"> | **Assigned** | Subject `(Assigned)` |
+| <img src="icons/Changes Requested.png" width="20"> | **Changes Requested** | Subject `(Changes requested)` |
+| <img src="icons/New Comment.png" width="20"> | **Comment** | Subject `(New comment)` or body "commented:" |
+| <img src="icons/Comment Edited.png" width="20"> | **Comment Edited** | Body indicates an edited comment |
+| <img src="icons/PR Approved.png" width="20"> | **Approved** | Subject `(Approved)` or body "Merge request was approved" |
+| <img src="icons/PR Merged.png" width="20"> | **Merged** | Subject `(Merged)` or body "was merged" |
+| <img src="icons/PR Closed.png" width="20"> | **Closed** | Subject `(Closed)` or body "was closed" |
+| <img src="icons/You Were Mentioned.png" width="20"> | **Mentioned** | Subject `(Mentioned)` or body contains username |
+| <img src="icons/PR Reassigned.png" width="20"> | **Reassigned** | Subject indicates reassignment |
+| | **Pipeline Failure** | Subject contains "Failed pipeline" |
+| | **Catch-all** | Any GitLab email with an MR number not matched above |
 
-## Setup
+## Getting Started
 
 ### Prerequisites
 
 - macOS with Apple Mail configured to receive GitLab email notifications
-- Python 3 (Homebrew recommended: `brew install python3`)
-- Xcode Command Line Tools (`xcode-select --install`) — needed to compile the Swift notification helper
+- Python 3 — `brew install python3`
+- Xcode Command Line Tools — `xcode-select --install`
 
-### 1. Clone and run the installer
+### Step 1: Clone & install
 
 ```bash
 git clone https://github.com/danielkuhlwein/gitlab-pr-notifier.git ~/Projects/gitlab-notifier
@@ -50,15 +76,22 @@ cd ~/Projects/gitlab-notifier
 chmod +x install.sh && ./install.sh
 ```
 
-The installer builds `GitlabNotifier.app` (from `wrapper.applescript`) and `GitlabNotifyHelper.app` (from `notify_helper.swift`), checks dependencies, and creates the logs directory. If the LaunchAgent plist already exists and is clean, it reloads it automatically. If not, it prints the exact command you need to run.
+The installer compiles `GitlabNotifier.app` and `GitlabNotifyHelper.app`, checks dependencies, and creates the logs directory.
 
-> **Important:** This folder must be on a **local drive**, not iCloud Drive. macOS blocks LaunchAgents from accessing iCloud paths. The installer checks for this and warns you.
+> [!IMPORTANT]
+> This folder must be on a **local drive**, not iCloud Drive. macOS blocks LaunchAgents from accessing iCloud paths. The installer checks for this and warns you.
 
-### 2. Create the LaunchAgent plist (one-time, manual step)
+### Step 2: Create the LaunchAgent plist
 
-> **Why manual?** macOS applies `com.apple.provenance` to files created by sandboxed apps (Claude, Cowork, IDEs, etc.). `launchd` refuses to execute jobs from provenance-tainted plists. The only reliable workaround is to create the plist from a clean Terminal session.
+> [!WARNING]
+> **This step must be done manually from Terminal.app** (launched via <kbd>Cmd</kbd>+<kbd>Space</kbd> → "Terminal"). macOS applies `com.apple.provenance` to files created by sandboxed apps (Claude, VS Code, etc.), and `launchd` refuses to run provenance-tainted plists.
 
-Open **Terminal.app from Spotlight** (Cmd+Space → "Terminal" → Enter) — not from any IDE. Then paste the following, replacing `<YOUR_PATH>` with the absolute path to this project folder:
+<details>
+<summary><strong>Expand to see the plist command</strong></summary>
+
+<br>
+
+Replace `<YOUR_PATH>` with the absolute path to this project folder, then paste into Terminal:
 
 ```bash
 cat > ~/Library/LaunchAgents/com.daniel.gitlab-notifier.plist <<'EOF'
@@ -98,7 +131,7 @@ cat > ~/Library/LaunchAgents/com.daniel.gitlab-notifier.plist <<'EOF'
 EOF
 ```
 
-Verify no provenance:
+Verify no provenance was applied:
 
 ```bash
 xattr -l ~/Library/LaunchAgents/com.daniel.gitlab-notifier.plist
@@ -111,7 +144,9 @@ Load the agent:
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.daniel.gitlab-notifier.plist
 ```
 
-### 3. Verify
+</details>
+
+### Step 3: Verify
 
 ```bash
 sleep 35 && launchctl list com.daniel.gitlab-notifier | grep LastExitStatus
@@ -121,7 +156,8 @@ sleep 35 && launchctl list com.daniel.gitlab-notifier | grep LastExitStatus
 
 ## Configuration
 
-Key settings are at the top of `gitlab_notifier.py`:
+> [!TIP]
+> Edit the variables at the top of `gitlab_notifier.py` to match your GitLab setup.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -132,7 +168,10 @@ Key settings are at the top of `gitlab_notifier.py`:
 | `GITLAB_MAILBOX` | `"Gitlab"` | Local Mail.app mailbox name |
 | `GITLAB_FOLDER_TTL_HOURS` | `24` | How long emails stay before auto-archiving |
 
-## Debugging
+<details>
+<summary><strong>Debugging</strong></summary>
+
+<br>
 
 ```bash
 # Watch logs in real time
@@ -158,15 +197,15 @@ To enable debug logging permanently, add this to the plist's `EnvironmentVariabl
 <string>1</string>
 ```
 
-## Testing
+</details>
 
-Run the classifier test suite:
+## Testing
 
 ```bash
 python3 test_classifier.py
 ```
 
-This runs 18 test cases covering all observed email types (including MIME-encoded bodies) and URL extraction.
+Runs 18 test cases covering all observed email types (including MIME-encoded bodies) and URL extraction.
 
 ## Uninstall
 
@@ -174,19 +213,28 @@ This runs 18 test cases covering all observed email types (including MIME-encode
 ./install.sh --uninstall
 ```
 
-## Project Structure
+<details>
+<summary><strong>Project Structure</strong></summary>
+
+<br>
 
 ```
 .
-├── install.sh                  # Installer (builds apps, checks deps, reloads agent)
-├── run_notifier.sh             # LaunchAgent wrapper (absorbs applet exit codes)
-├── wrapper.applescript         # AppleScript source — queries Mail.app
-├── gitlab_notifier.py          # Python classifier + notification dispatcher
-├── notify_helper.swift         # Swift notification sender (UNUserNotificationCenter)
-├── com.daniel.gitlab-notifier.plist  # LaunchAgent template (reference only)
-├── test_classifier.py          # Test suite for the email classifier
-├── icons/                      # Notification icons + app icon
-│   └── app_ico.png             # App icon (embedded by install.sh)
-├── CLAUDE.md                   # AI assistant instructions
+├── install.sh                          # Installer (builds apps, checks deps, reloads agent)
+├── run_notifier.sh                     # LaunchAgent wrapper (absorbs applet exit codes)
+├── wrapper.applescript                 # AppleScript source — queries Mail.app
+├── gitlab_notifier.py                  # Python classifier + notification dispatcher
+├── notify_helper.swift                 # Swift notification sender (UNUserNotificationCenter)
+├── com.daniel.gitlab-notifier.plist    # LaunchAgent template (reference only)
+├── test_classifier.py                  # Test suite for the email classifier
+├── icons/                              # Notification icons + app icon
+│   └── app_ico.png                     # App icon (embedded by install.sh)
+├── CLAUDE.md                           # AI assistant instructions
 └── .gitignore
 ```
+
+</details>
+
+## License
+
+[MIT](LICENSE) — do whatever you want with it.
