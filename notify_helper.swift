@@ -11,7 +11,8 @@
 //     -message "cav-ts-apps-tools !942: feat: semantic releases" \
 //     -open "https://gitlab.com/..." \
 //     -group "gitlab-cav-ts-apps-tools-!942" \
-//     -identifier "review_requested-gitlab-cav-ts-apps-tools-!942"
+//     -identifier "review_requested-gitlab-cav-ts-apps-tools-!942" \
+//     -image "/path/to/icons/Review Requested.png"
 //
 // Arguments:
 //   -title         Notification title
@@ -21,10 +22,9 @@
 //   -group         Thread identifier for visual grouping in Notification Center
 //   -identifier    Notification ID for replacement (same ID = replace old)
 //                  If omitted, defaults to -group value
-//
-// Note: macOS does not reliably display UNNotificationAttachment
-// images, so per-notification icons are not supported. The app's
-// bundle icon (CFBundleIconFile in Info.plist) is shown instead.
+//   -image         Path to a PNG icon to display as a notification attachment
+//                  (copied to a temp location because macOS moves non-bundled
+//                  attachments, which would delete the original)
 //
 // Build (done by install.sh):
 //   swiftc -O -o GitlabNotifyHelper notify_helper.swift \
@@ -43,6 +43,7 @@ struct NotifyArgs {
     var openURL: String?
     var group: String = "gitlab"
     var identifier: String?
+    var imagePath: String?
 }
 
 func parseArgs() -> NotifyArgs {
@@ -63,6 +64,8 @@ func parseArgs() -> NotifyArgs {
             i += 1; if i < argv.count { args.group = argv[i] }
         case "-identifier":
             i += 1; if i < argv.count { args.identifier = argv[i] }
+        case "-image":
+            i += 1; if i < argv.count { args.imagePath = argv[i] }
         default:
             // Silently skip unknown flags (and consume their value)
             if argv[i].hasPrefix("-") && i + 1 < argv.count
@@ -119,6 +122,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         // Store the URL so we can open it on click
         if let url = notifyArgs.openURL {
             content.userInfo = ["url": url]
+        }
+
+        // Attach per-notification icon (if provided)
+        if let imagePath = notifyArgs.imagePath {
+            let srcURL = URL(fileURLWithPath: imagePath)
+            let fileManager = FileManager.default
+            if fileManager.fileExists(atPath: imagePath) {
+                do {
+                    // Copy to temp dir because UNNotificationAttachment MOVES
+                    // files that are outside the app bundle.
+                    let tmpDir = fileManager.temporaryDirectory
+                        .appendingPathComponent("gitlab-notify-icons", isDirectory: true)
+                    try fileManager.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+                    let tmpFile = tmpDir.appendingPathComponent(srcURL.lastPathComponent)
+                    // Remove stale temp copy if it exists from a previous run
+                    try? fileManager.removeItem(at: tmpFile)
+                    try fileManager.copyItem(at: srcURL, to: tmpFile)
+                    let attachment = try UNNotificationAttachment(
+                        identifier: "icon",
+                        url: tmpFile,
+                        options: [UNNotificationAttachmentOptionsTypeHintKey: "public.png"]
+                    )
+                    content.attachments = [attachment]
+                } catch {
+                    fputs("Failed to attach image: \(error.localizedDescription)\n", stderr)
+                }
+            }
         }
 
         // identifier → replacement (same ID = update existing notification)

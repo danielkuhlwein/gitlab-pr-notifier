@@ -685,6 +685,7 @@ def send_notification(
     group_id: str = "gitlab",
     notification_id: str | None = None,
     subtitle: str = "",
+    image: str | None = None,
     logger: logging.Logger | None = None,
 ):
     """
@@ -709,6 +710,8 @@ def send_notification(
             cmd.extend(["-identifier", notification_id])
         if url:
             cmd.extend(["-open", url])
+        if image:
+            cmd.extend(["-image", image])
 
         # Log stderr to a file so we can diagnose permission issues etc.
         helper_log = LOG_DIR / "notify_helper.log"
@@ -824,13 +827,15 @@ def main():
             url or "none",
         )
 
-        # Send notification
+        # Send notification (with per-type icon if available)
+        icon_path = SCRIPT_DIR / "icons" / f"{classification.title}.png"
         send_notification(
             classification.notify_title,
             classification.notify_body,
             url=url,
             group_id=classification.group_id,
             notification_id=classification.notification_id,
+            image=str(icon_path) if icon_path.exists() else None,
             logger=logger,
         )
 
@@ -950,12 +955,15 @@ def process_from_file(input_path: str, output_path: str):
             url or "none",
         )
 
+        # Send notification (with per-type icon if available)
+        icon_path = SCRIPT_DIR / "icons" / f"{classification.title}.png"
         send_notification(
             classification.notify_title,
             classification.notify_body,
             url=url,
             group_id=classification.group_id,
             notification_id=classification.notification_id,
+            image=str(icon_path) if icon_path.exists() else None,
             logger=logger,
         )
 
