@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="icons/app_ico.png" alt="GitLab PR Notifier" width="120">
+  <img src="icons/app_icon.png" alt="GitLab PR Notifier" width="120">
   <h1>GitLab PR Notifier</h1>
   <p><em>Never miss a merge request again.<br>Native macOS notifications for GitLab, powered by Apple Mail.</em></p>
 

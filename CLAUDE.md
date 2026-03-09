@@ -30,7 +30,7 @@ the file themselves from an untainted process.
 - `install.sh` — Builds .app bundles, checks deps, reloads agent (does NOT create plist)
 - `com.daniel.gitlab-notifier.plist` — Template/reference only (not installed directly)
 - `test_classifier.py` — Test suite for the email classifier
-- `icons/` — App icon (`app_ico.png`) and notification-type icons
+- `icons/` — App icon (`app_icon.png`) and notification-type icons
 - `GitlabNotifier.app/` — Built artifact (compiled by osacompile, do not edit)
 - `GitlabNotifyHelper.app/` — Built artifact (compiled from notify_helper.swift, do not edit)
 

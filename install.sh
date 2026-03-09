@@ -241,7 +241,7 @@ if [[ -f "$HELPER_SWIFT" ]] && command -v swiftc &>/dev/null; then
 INFOPLIST
 
         # Convert app_icon.png → AppIcon.icns and embed in Resources
-        APP_ICON_SRC="${SCRIPT_DIR}/icons/app_ico.png"
+        APP_ICON_SRC="${SCRIPT_DIR}/icons/app_icon.png"
         HELPER_RESOURCES="${HELPER_APP_DIR}/Contents/Resources"
         if [[ -f "$APP_ICON_SRC" ]]; then
             echo "  Converting app icon to .icns..."
@@ -260,7 +260,7 @@ INFOPLIST
             fi
             rm -rf "$(dirname "$ICONSET_DIR")"
         else
-            warn "icons/app_ico.png not found — skipping app icon"
+            warn "icons/app_icon.png not found — skipping app icon"
         fi
 
         codesign --sign - --force "$HELPER_APP_DIR" 2>/dev/null || true
