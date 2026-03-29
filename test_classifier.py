@@ -9,7 +9,7 @@ import logging
 import sys
 
 sys.path.insert(0, ".")
-from gitlab_notifier import classify_email, extract_pr_url
+from gitlab_notifier import classify_email, extract_pr_url, extract_sender_name, Classification
 
 logger = logging.getLogger("test")
 logger.addHandler(logging.StreamHandler(sys.stdout))
@@ -298,6 +298,60 @@ def run_tests():
         else:
             print(f"  FAIL: {desc}")
             print(f"        Expected URL containing '{expected_url}', got '{url}'")
+            failed += 1
+
+    # --- Sender name extraction tests ---
+    print("\n--- Sender Name Extraction Tests ---")
+    sender_tests = [
+        # (from_field, source, expected_name)
+        ('"Morgan Dykshorn (@morgan-cavnue)" <gitlab@mg.gitlab.com>', "", "Morgan Dykshorn"),
+        ('Mallory Benna (@mallory-cavnue) <gitlab@mg.gitlab.com>', "", "Mallory Benna"),
+        ('"Isaac McRobie (@isaac-mcrobie)" <gitlab@mg.gitlab.com>', "", "Isaac McRobie"),
+        ('gitlab@mg.gitlab.com', "", ""),
+        ('', "", ""),
+        # Fallback: bare email in from_field, but MIME source has display name
+        (
+            'gitlab@mg.gitlab.com',
+            'From: "Morgan Dykshorn (@morgan-cavnue)" <gitlab@mg.gitlab.com>\r\nTo: Daniel\r\n',
+            "Morgan Dykshorn",
+        ),
+        # Fallback: empty from_field, MIME source has display name
+        (
+            '',
+            'Return-Path: <>\r\nFrom: Mallory Benna (@mallory-cavnue) <gitlab@mg.gitlab.com>\r\nSubject: test\r\n',
+            "Mallory Benna",
+        ),
+    ]
+
+    for from_field, source, expected_name in sender_tests:
+        name = extract_sender_name(from_field, source)
+        label = f"from={from_field!r}" + (f" +source" if source else "")
+        if name == expected_name:
+            print(f"  PASS: {label} → {name!r}")
+            passed += 1
+        else:
+            print(f"  FAIL: {label}")
+            print(f"        Expected {expected_name!r}, got {name!r}")
+            failed += 1
+
+    # --- notify_title format tests ---
+    print("\n--- Notify Title Format Tests ---")
+    c1 = Classification("approved", "✅", "PR Approved", "feat: something",
+                         sender_name="Morgan Dykshorn")
+    c2 = Classification("pipeline_failure", "🔴", "Pipeline Failed", "main (abc123)")
+
+    title_tests = [
+        ("With sender name", c1.notify_title, "PR Approved by Morgan Dykshorn"),
+        ("Without sender name", c2.notify_title, "Pipeline Failed"),
+    ]
+
+    for desc, actual, expected in title_tests:
+        if actual == expected:
+            print(f"  PASS: {desc} → {actual!r}")
+            passed += 1
+        else:
+            print(f"  FAIL: {desc}")
+            print(f"        Expected {expected!r}, got {actual!r}")
             failed += 1
 
     print(f"\n{'='*40}")

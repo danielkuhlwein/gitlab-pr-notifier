@@ -252,6 +252,44 @@ def cleanup_gitlab_folder(logger: logging.Logger):
 
 
 # ---------------------------------------------------------------------------
+# Extract sender display name from GitLab email "from" field
+# ---------------------------------------------------------------------------
+
+def extract_sender_name(from_field: str, source: str = "") -> str:
+    """Extract the human name from a GitLab email 'from' field.
+
+    Tries the parsed FROM field first, then falls back to the raw MIME
+    ``From:`` header in the email source (Mail.app's ``sender of msg``
+    sometimes returns only the bare email address).
+
+    Examples:
+        '"Morgan Dykshorn (@morgan-cavnue)" <gitlab@mg.gitlab.com>' → 'Morgan Dykshorn'
+        'Mallory Benna (@mallory-cavnue) <gitlab@mg.gitlab.com>'    → 'Mallory Benna'
+        'gitlab@mg.gitlab.com'                                       → ''
+    """
+    for value in (from_field, _extract_from_header(source) if source else ""):
+        if not value:
+            continue
+        # Name before (@username)
+        m = re.match(r'"?([^"(]+?)\s*\(@', value)
+        if m:
+            return m.group(1).strip()
+        # Name before <email> (no username)
+        m = re.match(r'"?([^"<]+?)"?\s*<', value)
+        if m:
+            name = m.group(1).strip()
+            if "@" not in name and len(name) > 1:
+                return name
+    return ""
+
+
+def _extract_from_header(source: str) -> str:
+    """Pull the raw ``From:`` header value from MIME source."""
+    m = re.search(r"^From:\s*(.+)$", source[:4000], re.MULTILINE | re.IGNORECASE)
+    return m.group(1).strip() if m else ""
+
+
+# ---------------------------------------------------------------------------
 # Parse raw AppleScript output into structured email dicts
 # ---------------------------------------------------------------------------
 
@@ -381,10 +419,11 @@ def decode_mime_source(raw_source: str) -> str:
 
 # Dataclass-like named tuple for classification results
 class Classification:
-    __slots__ = ("type", "icon", "title", "pr_title", "priority", "project", "mr_number")
+    __slots__ = ("type", "icon", "title", "pr_title", "priority", "project", "mr_number",
+                 "sender_name")
 
     def __init__(self, type_: str, icon: str, title: str, pr_title: str, priority: int = 5,
-                 project: str = "", mr_number: str = ""):
+                 project: str = "", mr_number: str = "", sender_name: str = ""):
         self.type = type_
         self.icon = icon           # emoji for this notification type
         self.title = title         # human-readable action (e.g. "Review Requested")
@@ -392,14 +431,17 @@ class Classification:
         self.priority = priority   # lower = more important
         self.project = project     # repo name (e.g. "cav-ts-apps-tools")
         self.mr_number = mr_number # MR number without ! (e.g. "942")
+        self.sender_name = sender_name  # who performed the action (e.g. "Morgan Dykshorn")
 
     def __repr__(self):
         return f"Classification({self.type!r}, {self.title!r})"
 
     @property
     def notify_title(self) -> str:
-        """Notification title: emoji + action (e.g. '📋 Review Requested')."""
-        return f"{self.icon} {self.title}"
+        """Notification title: action + sender (e.g. 'PR Approved by Morgan Dykshorn')."""
+        if self.sender_name:
+            return f"{self.title} by {self.sender_name}"
+        return self.title
 
     @property
     def notify_body(self) -> str:
@@ -814,14 +856,19 @@ def main():
             ids_to_move.append(msg_id)  # Still move unclassified GitLab emails
             continue
 
+        # Attach sender name (e.g. "Morgan Dykshorn") from the email From field
+        raw_from = email.get("from", "")
+        classification.sender_name = extract_sender_name(raw_from, email.get("source", ""))
+        logger.info("Sender extraction: from=%r → sender_name=%r", raw_from, classification.sender_name)
+
         # Extract URL
         url = extract_pr_url(email, logger)
 
-        # Log the classification
+        # Log the classification (includes final notify_title with sender)
         logger.info(
             "NOTIFY [%s] %s — %s | %s (url=%s)",
             classification.type,
-            classification.title,
+            classification.notify_title,
             classification.project,
             classification.pr_title,
             url or "none",
@@ -945,11 +992,16 @@ def process_from_file(input_path: str, output_path: str):
             ids_to_move.append(msg_id)
             continue
 
+        # Attach sender name (e.g. "Morgan Dykshorn") from the email From field
+        raw_from = email.get("from", "")
+        classification.sender_name = extract_sender_name(raw_from, email.get("source", ""))
+        logger.info("Sender extraction: from=%r → sender_name=%r", raw_from, classification.sender_name)
+
         url = extract_pr_url(email, logger)
         logger.info(
             "NOTIFY [%s] %s — %s | %s (url=%s)",
             classification.type,
-            classification.title,
+            classification.notify_title,
             classification.project,
             classification.pr_title,
             url or "none",

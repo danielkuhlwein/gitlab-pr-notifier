@@ -1,5 +1,4 @@
 <div align="center">
-  <img src="icons/app_icon.png" alt="GitLab PR Notifier" width="120">
   <h1>GitLab PR Notifier</h1>
   <p><strong>This project has been superseded by <a href="https://github.com/danielkuhlwein/tanuki-bell">Tanuki Bell</a></strong></p>
 </div>
